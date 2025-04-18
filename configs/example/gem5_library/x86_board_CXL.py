@@ -61,6 +61,7 @@ from m5.util.convert import toMemorySize
 
 from gem5.components.boards.abstract_system_board import AbstractSystemBoard
 from gem5.components.boards.kernel_disk_workload import KernelDiskWorkload
+from gem5.components.boards.se_binary_workload import SEBinaryWorkload
 from gem5.components.cachehierarchies.abstract_cache_hierarchy import (
     AbstractCacheHierarchy,
 )
@@ -73,10 +74,11 @@ from gem5.utils.override import overrides
 
 class X86Board(AbstractSystemBoard, KernelDiskWorkload):
     """
-    X86 full‑system board extended with one extra “AFU” CPU whose memory
-    requests are steered by address into two L2 caches:
-        * HMC_L2  – forwarded to the normal L3/host DDR path
-        * CXLDMC  – forwarded to the CXL memory path
+    A board capable of full system simulation for X86.
+
+    **Limitations**
+    * Currently, this board's memory is hardcoded to 3GB.
+    * Much of the I/O subsystem is hard coded.
     """
 
     def __init__(
@@ -98,62 +100,66 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         )
 
         if self.get_processor().get_isa() != ISA.X86:
-            raise RuntimeError(
-                f"X86Board requires an X86 processor, got {processor.get_isa()}"
+            raise Exception(
+                "The X86Board requires a processor using the X86 "
+                f"ISA. Current processor ISA: '{processor.get_isa().name}'."
             )
-
-    # --------------------------------------------------------------------- #
-    #  System‑level construction                                            #
-    # --------------------------------------------------------------------- #
 
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
-        # -------------------------------------------------------------- 0 —
-        # vanilla board skeleton (same as stock X86Board)
+        # ——————————————————————————————————————————————
+        # 0) vanilla full‑system X86 setup
+        # ——————————————————————————————————————————————
         self.pc = Pc()
         self.workload = X86FsLinux()
         self.iobus = IOXBar()
         self._setup_io_devices()  # builds self.apicbridge + self.cxl_mem_bus
-        self.m5ops_base = 0xFFFF_0000
+        self.m5ops_base = 0xFFFF0000
 
-        # -------------------------------------------------------------- 1 —
-        # one extra “AFU” core
+        # ——————————————————————————————————————————————
+        # 1) extra AFU core + its interrupt controller
+        # ——————————————————————————————————————————————
         afu_id = self.get_processor().get_num_cores()
         self.afu_core = X86AtomicSimpleCPU(cpu_id=afu_id)
         self.afu_core.createThreads()
         self.afu_core.createInterruptController()
 
-        # ----  interrupt wiring (identical to the host CPUs) -------------
         ic = self.afu_core.interrupts[0]
-
-        # * Programmed‑I/O accesses to the LAPIC/MMIO registers go out the
-        #   IO bus *mem‑side* (a requestor port → responder pio port)
+        # MMIO‑style LAPIC/MMIO → I/O bus
         ic.pio = self.iobus.mem_side_ports
-
-        # * Message‑signalled interrupts share the existing APIC bridge.
+        # MSI‑style interrupts → I/O bus
         ic.int_requestor = self.iobus.cpu_side_ports
         ic.int_responder = self.iobus.mem_side_ports
 
-        # -------------------------------------------------------------- 2 —
-        # address windows that decide which “L2” path the AFU uses
-        hmc_window = AddrRange(0x0000_0000, 0x1FFF_FFFF)  # host/HMC
-        dmc_window = AddrRange(0x2000_0000, 0x2FFF_FFFF)  # CXL/DMC
+        # keep a Python ref so it doesn’t get GC’d
+        self._afu_interrupt_ctrl = ic
 
-        # -------------------------------------------------------------- 3 —
-        # steer‑by‑address cross‑bar  +  two sibling private L2 caches
-        self.afu_steer_xbar = CoherentXBar(
-            width=16,
+        # ——————————————————————————————————————————————
+        # 2) define HMC vs DMC windows
+        # ——————————————————————————————————————————————
+        hmc_window = AddrRange(0x0000_0000, 0x1FFF_FFFF)
+        dmc_window = AddrRange(0x2000_0000, 0x2FFF_FFFF)
+
+        # ——————————————————————————————————————————————
+        # 3) steer‑by‑address XBar + two private L2s
+        # ——————————————————————————————————————————————
+        # self.afu_steer_xbar = CoherentXBar(
+        #     width                  = 16,
+        #     forward_latency        = 1,
+        #     response_latency       = 1,
+        #     snoop_response_latency = 1,
+        #     frontend_latency       = 1,
+        # )
+        self.afu_steer_xbar = BaseXBar(
             forward_latency=1,
             response_latency=1,
-            frontend_latency=1,
-            snoop_response_latency=1,
         )
 
-        # CPU  ↔  steer‑xbar
+        # hook AFU’s I/D caches to the steer‑xbar
         self.afu_core.icache_port = self.afu_steer_xbar.cpu_side_ports
         self.afu_core.dcache_port = self.afu_steer_xbar.cpu_side_ports
 
-        # ---- HMC‑side L2  (continues into normal cache hierarchy/L3) ----
+        # HMC‐side L2 → normal host DDR path
         self.afu_hmc_l2 = Cache(
             size="256kB",
             assoc=8,
@@ -167,8 +173,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_hmc_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
         self.afu_hmc_l2.mem_side = self.cache_hierarchy.get_cpu_side_port()
 
-        # ---- CXL‑side L2  (feeds the CXLMemBar) -------------------------
-        self.cxldmc_l2 = Cache(
+        # CXL‐side L2 → CXLMemBar
+        self.afu_cxl_l2 = Cache(
             size="256kB",
             assoc=8,
             tag_latency=4,
@@ -178,23 +184,29 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             tgts_per_mshr=8,
             addr_ranges=[dmc_window],
         )
-        self.cxldmc_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
-        self.cxldmc_l2.mem_side = self.cxl_mem_bus.cpu_side_ports
+        self.afu_cxl_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
+        self.afu_cxl_l2.mem_side = self.cxl_mem_bus.cpu_side_ports
 
-        # keep Python refs so they’re not garbage‑collected
-        # self._afu_parts = [self.afu_steer_xbar, self.afu_hmc_l2, self.cxldmc_l2]
+        # keep refs so Python doesn’t drop them
+        self._afu_l2_subsystem = [
+            self.afu_steer_xbar,
+            self.afu_hmc_l2,
+            self.afu_cxl_l2,
+        ]
 
-        # -------------------------------------------------------------- 4 —
-        # tell the guest OS about the new processor
+        # ——————————————————————————————————————————————
+        # 4) advertise the AFU in the MP table
+        # ——————————————————————————————————————————————
         self.workload.intel_mp_table.base_entries.append(
             X86IntelMPProcessor(
                 local_apic_id=afu_id,
                 local_apic_version=0x14,
                 enable=True,
                 bootstrap=False,
-                eventq_index=afu_id,  # avoid proxy error
+                eventq_index=afu_id,
             )
         )
+        # self._finish_mp_and_e820()
 
     def _setup_io_devices(self):
         """Sets up the x86 IO devices.
