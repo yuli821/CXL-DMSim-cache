@@ -1,15 +1,14 @@
-// NOTE: This is a pure protocol translation version of CXLCacheBridge
-// bridging host coherence messages and device-side CXL.cache logic with
-// retry logic, forwarding queue support, and complete MemCmd translation.
+// NOTE: This is a clocked version of CXLCacheBridge
+// enabling artificial delay injection and timed forwarding behavior.
 
-#include "mem/CXLCacheBridge.hh"
+#include "mem/cache/CXLCacheBridge.hh"
 #include "mem/packet.hh"
 #include "debug/CXLCacheBridge.hh"
 
 namespace gem5 {
 
 CXLCacheBridge::CXLCacheBridge(const CXLCacheBridgeParams &p)
-    : MemObject(p),
+    : ClockedObject(p),
       cpuSidePort(name() + ".cpu_side_port", *this),
       memSidePort(name() + ".mem_side_port", *this),
       waitingResp(false),
@@ -23,7 +22,7 @@ Port &CXLCacheBridge::getPort(const std::string &if_name, PortID)
 {
     if (if_name == "cpu_side_port") return cpuSidePort;
     if (if_name == "mem_side_port") return memSidePort;
-    return MemObject::getPort(if_name);
+    return ClockedObject::getPort(if_name);
 }
 
 AddrRangeList CXLCacheBridge::getAddrRanges() const
@@ -111,7 +110,12 @@ void CXLCacheBridge::handleDeviceResponse(PacketPtr pkt)
 
 bool CXLCacheBridge::sendToDevice(PacketPtr pkt)
 {
-    translateToDevice(pkt);
+    // Artificial delay injection using ClockedObject
+    // For example, delay one clock cycle before sending
+    schedule(new EventFunctionWrapper([this, pkt]() {
+        translateToDevice(pkt);
+    }, "DelayedTranslateToDevice"), clockEdge(Cycles(1)));
+
     return true;
 }
 
@@ -136,7 +140,7 @@ void CXLCacheBridge::translateToDevice(PacketPtr pkt)
             // no translation needed
             break;
         case MemCmd::Go:
-            pkt->cmd = MemCmd::Go; // preserve GO marker
+            pkt->cmd = MemCmd::Go;
             break;
         default:
             DPRINTF(CXLBridge, "[CXLBridge] Warning: Unhandled translation Host → Device: %s\n",

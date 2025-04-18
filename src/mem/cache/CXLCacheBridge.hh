@@ -1,7 +1,7 @@
 #ifndef __MEM_CXL_CACHE_BRIDGE_HH__
 #define __MEM_CXL_CACHE_BRIDGE_HH__
 
-#include "mem/mem_object.hh"
+#include "sim/clocked_object.hh"
 #include "mem/port.hh"
 #include <deque>
 
@@ -16,10 +16,10 @@ namespace gem5 {
  * translating device-initiated requests (e.g., writebacks) to host-visible
  * memory system packets.
  * 
- * The bridge supports backpressure and retry logic, and enables the
- * HMC (Host-managed Cache) to access host memory coherently.
+ * The bridge supports backpressure, retry logic, and cycle-based scheduling
+ * using ClockedObject for artificial timing delays.
  */
-class CXLCacheBridge : public MemObject
+class CXLCacheBridge : public ClockedObject
 {
   public:
     CXLCacheBridge(const CXLCacheBridgeParams &p);

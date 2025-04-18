@@ -1,5 +1,5 @@
 #include "base/unittest.hh"
-#include "mem/CXLCacheBridge.hh"
+#include "mem/cache/CXLCacheBridge.hh"
 #include "mem/packet.hh"
 
 using namespace gem5;
