@@ -736,4 +736,7 @@ for env in (envs[e] for e in needed_envs):
     for cls in TopLevelMeta.all:
         cls.declare_all(env)
 
-Program('test_cxl_cache_bridge', ['./mem/cache/test_cxl_cache_bridge.cc', './mem/cache/CXLCacheBridge.cc'],CXXFLAGS=['-Isrc'])
+Program('test_cxl_cache_bridge', ['./mem/cache/test_cxl_cache_bridge.cc', './mem/cache/CXLCacheBridge.cc'],
+        CXXFLAGS=['-Isrc', '-std=c++17', '-gz', '-pipe', '-fno-strict-aliasing', '-Wall', '-Wundef', '-Wextra', '-Wundef', '-Wno-sign-compare',
+                  '-Wno-unused-parameter', '-fno-builtin-malloc', '-fno-builtin-calloc', '-fno-builtin-realloc', '-fno-builtin-free', '-DPROTOBUF_INLINE_NOT_IN_HEADERS=0',
+                  '-g', '-03', '-DMAGIC_ENUM_RANGE_MAX=0x100', '-DPROTOCOL_MESI_Two_Level', '-DNUMBER_BITS_PER_SET=128', '-DTRACING_ON=1'])
