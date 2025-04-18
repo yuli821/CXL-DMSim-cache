@@ -1,7 +1,7 @@
 #ifndef __MEM_CACHE_CXL_CACHE_BRIDGE_HH__
 #define __MEM_CACHE_CXL_CACHE_BRIDGE_HH__
 
-#include "mem/port.hh"
+#include "mem/qport.hh"
 #include "mem/packet.hh"
 #include "sim/clocked_object.hh"
 #include <deque>
