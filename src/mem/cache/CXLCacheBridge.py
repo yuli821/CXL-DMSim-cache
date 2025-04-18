@@ -8,3 +8,5 @@ class CXLCacheBridge(SimObject):
 
     cpu_side_port = SlavePort("Port that connects to host coherence fabric")
     mem_side_port = MasterPort("Port that connects to CXL HMC or memory")
+
+sim_objects = ['CXLCacheBridge']
