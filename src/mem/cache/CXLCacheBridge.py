@@ -4,9 +4,12 @@ from m5.SimObject import SimObject
 class CXLCacheBridge(SimObject):
     type = 'CXLCacheBridge'
     cxx_class = 'gem5::CXLCacheBridge'
-    cxx_header = "mem/cache/CXLCacheBridge.hh"
+    cxx_header = 'mem/cache/CXLCacheBridge.hh'
 
-    cpu_side_port = SlavePort("Port that connects to host coherence fabric")
-    mem_side_port = MasterPort("Port that connects to CXL HMC or memory")
+    cpu_side_port = ResponsePort("Port that receives from host/cache side")
+    mem_side_port = RequestPort("Port that sends to CXL-attached device")
+
+    # Optional config params (for future extensions)
+    # latency = Param.Latency("Link latency between bridge and device")
 
 sim_objects = ['CXLCacheBridge']
