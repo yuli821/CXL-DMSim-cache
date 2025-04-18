@@ -41,18 +41,26 @@ build/X86/gem5.opt configs/example/gem5_library/x86-cxl-run.py
 """
 import argparse
 
+from x86_board_CXL import X86Board
+
 import m5
-from gem5.utils.requires import requires
-from gem5.components.boards.x86_board import X86Board
-from gem5.components.memory.single_channel import DIMM_DDR5_4400, SingleChannelDDR4_3200
+
+from gem5.components.memory.single_channel import (
+    DIMM_DDR5_4400,
+    SingleChannelDDR4_3200,
+)
+from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.processors.simple_switchable_processor import (
     SimpleSwitchableProcessor,
 )
-from gem5.components.processors.cpu_types import CPUTypes
 from gem5.isas import ISA
-from gem5.simulate.simulator import Simulator
+from gem5.resources.resource import (
+    DiskImageResource,
+    KernelResource,
+)
 from gem5.simulate.exit_event import ExitEvent
-from gem5.resources.resource import DiskImageResource, KernelResource
+from gem5.simulate.simulator import Simulator
+from gem5.utils.requires import requires
 
 # This runs a check to ensure the gem5 binary is compiled to X86 and to the
 # MESI Three Level coherence protocol.
@@ -63,19 +71,46 @@ from gem5.components.cachehierarchies.classic.private_l1_private_l2_shared_l3_ca
     PrivateL1PrivateL2SharedL3CacheHierarchy,
 )
 
-parser = argparse.ArgumentParser(description='CXL system parameters.')
-parser.add_argument('--is_asic', action='store', type=str, nargs='?', choices=['True', 'False'], default='True', help='Choose to simulate CXL ASIC Device or FPGA Device.')
-parser.add_argument('--test_cmd', type=str, choices=['lmbench_cxl.sh', 
-                                                     'lmbench_dram.sh', 
-                                                     'merci_dram.sh', 
-                                                     'merci_cxl.sh', 
-                                                     'merci_dram+cxl.sh',
-                                                     'stream_dram.sh',
-                                                     'stream_cxl.sh'
-                                                     ], default='lmbench_cxl.sh', help='Choose a test to run.')
-parser.add_argument('--num_cpus', type=int, default=1, help='Number of CPUs')
-parser.add_argument('--cpu_type', type=str, choices=['TIMING', 'O3'], default='TIMING', help='CPU type')
-parser.add_argument('--cxl_mem_type', type=str, choices=['Simple', 'DRAM'], default='DRAM', help='CXL memory type')
+parser = argparse.ArgumentParser(description="CXL system parameters.")
+parser.add_argument(
+    "--is_asic",
+    action="store",
+    type=str,
+    nargs="?",
+    choices=["True", "False"],
+    default="True",
+    help="Choose to simulate CXL ASIC Device or FPGA Device.",
+)
+parser.add_argument(
+    "--test_cmd",
+    type=str,
+    choices=[
+        "lmbench_cxl.sh",
+        "lmbench_dram.sh",
+        "merci_dram.sh",
+        "merci_cxl.sh",
+        "merci_dram+cxl.sh",
+        "stream_dram.sh",
+        "stream_cxl.sh",
+    ],
+    default="lmbench_cxl.sh",
+    help="Choose a test to run.",
+)
+parser.add_argument("--num_cpus", type=int, default=1, help="Number of CPUs")
+parser.add_argument(
+    "--cpu_type",
+    type=str,
+    choices=["TIMING", "O3"],
+    default="TIMING",
+    help="CPU type",
+)
+parser.add_argument(
+    "--cxl_mem_type",
+    type=str,
+    choices=["Simple", "DRAM"],
+    default="DRAM",
+    help="CXL memory type",
+)
 
 args = parser.parse_args()
 
@@ -106,7 +141,7 @@ else:
 
 processor = SimpleSwitchableProcessor(
     starting_core_type=CPUTypes.ATOMIC,
-    switch_core_type = CPUTypes.O3 if args.cpu_type == 'O3' else CPUTypes.TIMING,
+    switch_core_type=CPUTypes.O3 if args.cpu_type == "O3" else CPUTypes.TIMING,
     isa=ISA.X86,
     num_cores=args.num_cpus,
 )
@@ -118,7 +153,7 @@ board = X86Board(
     memory=memory,
     cache_hierarchy=cache_hierarchy,
     cxl_memory=cxl_memory,
-    is_asic=(args.is_asic == 'True')
+    is_asic=(args.is_asic == "True"),
 )
 
 # Here we set the Full System workload.
@@ -134,21 +169,21 @@ command = (
     "m5 exit;"
     + "numactl -H;"
     + "m5 resetstats;"
-    + "/home/cxl_benchmark/" + args.test_cmd + ";"
+    + "/home/cxl_benchmark/"
+    + args.test_cmd
+    + ";"
 )
 
 # Please modify the paths of kernel and disk_image according to the location of your files.
 board.set_kernel_disk_workload(
-    kernel=KernelResource(local_path='/home/xxx/code/fs_image/vmlinux_20240920'),
-    disk_image=DiskImageResource(local_path='/home/xxx/code/fs_image/parsec.img'),
+    kernel=KernelResource(local_path="/home/soonha1008/vmlinux_20240920"),
+    disk_image=DiskImageResource(local_path="/home/soonha1008/parsec.img"),
     readfile_contents=command,
 )
 
 simulator = Simulator(
     board=board,
-    on_exit_event={
-        ExitEvent.EXIT: (func() for func in [processor.switch])
-    },
+    on_exit_event={ExitEvent.EXIT: (func() for func in [processor.switch])},
 )
 
 print("Running the simulation")
