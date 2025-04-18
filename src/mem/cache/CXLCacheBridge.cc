@@ -1,5 +1,5 @@
-#include "mem/cxl_cache_bridge.hh"
-#include "debug/CXLBridge.hh"
+#include "mem/cache/CXLCacheBridge.hh"
+#include "debug/CXLCacheBridge.hh"
 #include "sim/system.hh"
 #include "base/trace.hh"
 #include "base/logging.hh"
