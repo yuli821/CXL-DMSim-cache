@@ -4,7 +4,7 @@
 
 #include "mem/CXLCacheBridge.hh"
 #include "mem/packet.hh"
-#include "debug/CXLBridge.hh"
+#include "debug/CXLCacheBridge.hh"
 
 namespace gem5 {
 

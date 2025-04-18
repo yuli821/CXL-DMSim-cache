@@ -1,8 +1,7 @@
-#include "mem/cxl_cache_bridge.hh"
+#include "mem/CXLCacheBridge.hh"
 #include "mem/packet.hh"
 #include "sim/sim_object.hh"
 #include "base/trace.hh"
-#include "debug/CXLBridge.hh"
 #include <cassert>
 #include <iostream>
 
