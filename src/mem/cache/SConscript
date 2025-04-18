@@ -38,6 +38,7 @@ SimObject('CXLCacheBridge.py', sim_objects=['CXLCacheBridge'])
 Source('CXLCacheBridge.cc')
 Source("test_cxl_cache_bridge.cc")
 
+DebugFlag('CXLCacheBridge')
 
 Source('base.cc')
 Source('cache.cc')
