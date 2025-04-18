@@ -36,7 +36,8 @@ SimObject('Cache.py', sim_objects=[
 SimObject('CXLCacheBridge.py', sim_objects=['CXLCacheBridge'])
 
 Source('cxl_cache_bridge.cc')
-Source('test_cxl_cache_bridge.cc')
+if env['TESTING']:
+    Source('unittests/test_cxl_cache_bridge.cc')
 
 DebugFlag('CXLCacheBridge')
 
@@ -64,5 +65,3 @@ DebugFlag('HWPrefetchQueue')
 # it explicitly even above and beyond CacheAll.
 CompoundFlag('CacheAll', ['Cache', 'CacheComp', 'CachePort', 'CacheRepl',
                           'CacheVerbose', 'HWPrefetch', 'MSHR'])
-
-Executable('test_cxl_cache_bridge', ['test_cxl_cache.cc', 'CXLCacheBridge.cc'])
