@@ -3,6 +3,7 @@
 
 #include "sim/clocked_object.hh"
 #include "mem/port.hh"
+#include "mem/packet.hh"
 #include <deque>
 
 namespace gem5 {
@@ -24,14 +25,8 @@ class CXLCacheBridge : public ClockedObject
   public:
     CXLCacheBridge(const CXLCacheBridgeParams &p);
 
-    /**
-     * Get access ports
-     */
     Port &getPort(const std::string &if_name, PortID idx = InvalidPortID) override;
 
-    /**
-     * Report address ranges visible to the coherence fabric (CoherentXBar)
-     */
     AddrRangeList getAddrRanges() const override;
 
   protected:
@@ -42,12 +37,14 @@ class CXLCacheBridge : public ClockedObject
       private:
         CXLCacheBridge &bridge;
       public:
-        CPUSidePort(const std::string &name, CXLCacheBridge &b)
-          : SlavePort(name, &b), bridge(b) {}
+        CPUSidePort(const std::string &name, CXLCacheBridge &b);
 
-        bool recvTimingReq(PacketPtr pkt) override;         // Host request
-        bool recvTimingSnoopReq(PacketPtr pkt) override;    // Host snoop
-        void recvReqRetry() override;                       // Retry if device was busy
+        bool recvTimingReq(PacketPtr pkt) override;
+        bool recvTimingSnoopReq(PacketPtr pkt) override;
+        void recvReqRetry() override;
+        Tick recvAtomic(PacketPtr pkt) override;
+        void recvFunctional(PacketPtr pkt) override;
+        AddrRangeList getAddrRanges() const override;
     };
 
     /**
@@ -57,29 +54,27 @@ class CXLCacheBridge : public ClockedObject
       private:
         CXLCacheBridge &bridge;
       public:
-        MemSidePort(const std::string &name, CXLCacheBridge &b)
-          : MasterPort(name, &b), bridge(b) {}
+        MemSidePort(const std::string &name, CXLCacheBridge &b);
 
-        bool recvTimingReq(PacketPtr pkt) override;         // Device writeback or eviction
-        bool recvTimingResp(PacketPtr pkt) override;        // Response from host memory
-        void recvRespRetry() override;                      // Retry if host was busy
+        bool recvTimingReq(PacketPtr pkt) override;
+        bool recvTimingResp(PacketPtr pkt) override;
+        void recvRespRetry() override;
+        void recvReqRetry() override;
+        Tick recvAtomic(PacketPtr pkt) override;
+        void recvFunctional(PacketPtr pkt) override;
     };
 
-    // Internal handlers for packet routing
     void handleHostRequest(PacketPtr pkt);
     void handleHostSnoop(PacketPtr pkt);
     void handleDeviceResponse(PacketPtr pkt);
 
-    // Translation functions between classic MemCmd and CXL.cache semantics
     bool sendToDevice(PacketPtr pkt);
     void translateToDevice(PacketPtr pkt);
     void translateToHost(PacketPtr pkt);
 
-    // Bridge ports
     CPUSidePort cpuSidePort;
     MemSidePort memSidePort;
 
-    // Internal queues and backpressure flags
     static std::deque<PacketPtr> hostToDeviceQueue;
     static std::deque<PacketPtr> deviceToHostQueue;
     static bool waitingReq;
