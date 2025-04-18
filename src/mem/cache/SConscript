@@ -65,4 +65,4 @@ DebugFlag('HWPrefetchQueue')
 CompoundFlag('CacheAll', ['Cache', 'CacheComp', 'CachePort', 'CacheRepl',
                           'CacheVerbose', 'HWPrefetch', 'MSHR'])
 
-Executable('test_cxl_cache_bridge', sources=['test_cxl_cache.cc', 'CXLCacheBridge.cc'])
+TestProgram('test_cxl_cache_bridge', ['test_cxl_cache.cc', 'CXLCacheBridge.cc'])
