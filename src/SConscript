@@ -736,4 +736,4 @@ for env in (envs[e] for e in needed_envs):
     for cls in TopLevelMeta.all:
         cls.declare_all(env)
 
-Program('test_cxl_cache_bridge', ['test_cxl_cache_bridge.cc', 'CXLCacheBridge.cc'])
+Program('test_cxl_cache_bridge', ['./mem/cache/test_cxl_cache_bridge.cc', './mem/cache/CXLCacheBridge.cc'])
