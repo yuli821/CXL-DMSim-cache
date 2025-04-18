@@ -1,22 +1,21 @@
+// NOTE: This is a clocked version of CXLCacheBridge
+// enabling artificial delay injection and timed forwarding behavior.
+
 #include "mem/cache/CXLCacheBridge.hh"
+#include "mem/packet.hh"
 #include "debug/CXLCacheBridge.hh"
-#include "sim/system.hh"
-#include "base/trace.hh"
-#include "base/logging.hh"
-#include "sim/eventq.hh"
-#include "sim/sim_object.hh"
 
 namespace gem5 {
 
 CXLCacheBridge::CXLCacheBridge(const CXLCacheBridgeParams &p)
     : ClockedObject(p),
       cpuSidePort(name() + ".cpu_side_port", *this),
-      memSidePort(name() + ".mem_side_port", *this)
+      memSidePort(name() + ".mem_side_port", *this),
+      waitingResp(false),
+      waitingReq(false)
 {
     hostToDeviceQueue.clear();
     deviceToHostQueue.clear();
-    waitingReq = false;
-    waitingResp = false;
 }
 
 Port &CXLCacheBridge::getPort(const std::string &if_name, PortID)
@@ -26,124 +25,169 @@ Port &CXLCacheBridge::getPort(const std::string &if_name, PortID)
     return ClockedObject::getPort(if_name);
 }
 
-AddrRangeList CXLCacheBridge::getAddrRanges() const {
+AddrRangeList CXLCacheBridge::getAddrRanges() const
+{
     AddrRangeList ranges;
     ranges.push_back(RangeSize(0x00000000, 0xC0000000));
     return ranges;
 }
 
-// ===== CPUSidePort Implementation =====
-CXLCacheBridge::CPUSidePort::CPUSidePort(const std::string &name, CXLCacheBridge &b)
-    : SlavePort(name, &b), bridge(b) {}
-
-bool CXLCacheBridge::CPUSidePort::recvTimingReq(PacketPtr pkt) {
-    return bridge.sendToDevice(pkt);
+bool CXLCacheBridge::CPUSidePort::recvTimingReq(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Host timing request | Addr: %#x | Cmd: %s\n",
+            pkt->getAddr(), pkt->cmd.toString().c_str());
+    if (!bridge.sendToDevice(pkt)) {
+        bridge.hostToDeviceQueue.push_back(pkt);
+        bridge.waitingReq = true;
+        return false;
+    }
+    return true;
 }
 
-bool CXLCacheBridge::CPUSidePort::recvTimingSnoopReq(PacketPtr pkt) {
+bool CXLCacheBridge::CPUSidePort::recvTimingSnoopReq(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Received timing snoop req | Addr: %#x\n", pkt->getAddr());
     bridge.handleHostSnoop(pkt);
     return true;
 }
 
-void CXLCacheBridge::CPUSidePort::recvReqRetry() {
-    // Implement retry logic if needed
+bool CXLCacheBridge::CPUSidePort::recvTimingResp(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Host response from memory → Device | Addr: %#x | Cmd: %s\n",
+            pkt->getAddr(), pkt->cmd.toString().c_str());
+    bridge.memSidePort.sendTimingResp(pkt);
+    return true;
 }
 
-Tick CXLCacheBridge::CPUSidePort::recvAtomic(PacketPtr pkt) {
-    return 0; // Not modeled for now
+bool CXLCacheBridge::MemSidePort::recvTimingReq(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Device request → Host | Addr: %#x | Cmd: %s\n",
+            pkt->getAddr(), pkt->cmd.toString().c_str());
+    if (!bridge.cpuSidePort.sendTimingReq(pkt)) {
+        bridge.deviceToHostQueue.push_back(pkt);
+        bridge.waitingResp = true;
+        return false;
+    }
+    return true;
 }
 
-void CXLCacheBridge::CPUSidePort::recvFunctional(PacketPtr pkt) {
-    // Directly forward functional access to memory
-    bridge.memSidePort.sendFunctional(pkt);
-}
-
-AddrRangeList CXLCacheBridge::CPUSidePort::getAddrRanges() const {
-    return bridge.getAddrRanges();
-}
-
-// ===== MemSidePort Implementation =====
-CXLCacheBridge::MemSidePort::MemSidePort(const std::string &name, CXLCacheBridge &b)
-    : MasterPort(name, &b), bridge(b) {}
-
-bool CXLCacheBridge::MemSidePort::recvTimingReq(PacketPtr pkt) {
-    return bridge.cpuSidePort.sendTimingReq(pkt);
-}
-
-bool CXLCacheBridge::MemSidePort::recvTimingResp(PacketPtr pkt) {
+bool CXLCacheBridge::MemSidePort::recvTimingResp(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Device response → Host | Addr: %#x | Cmd: %s\n",
+            pkt->getAddr(), pkt->cmd.toString().c_str());
     bridge.handleDeviceResponse(pkt);
     return true;
 }
 
-void CXLCacheBridge::MemSidePort::recvRespRetry() {
-    // Implement if needed
+void CXLCacheBridge::CPUSidePort::recvReqRetry()
+{
+    if (bridge.waitingReq && !bridge.hostToDeviceQueue.empty()) {
+        PacketPtr pkt = bridge.hostToDeviceQueue.front();
+        if (bridge.memSidePort.sendTimingReq(pkt)) {
+            bridge.hostToDeviceQueue.pop_front();
+            bridge.waitingReq = false;
+        }
+    }
 }
 
-void CXLCacheBridge::MemSidePort::recvReqRetry() {
-    // Implement if needed
+void CXLCacheBridge::MemSidePort::recvRespRetry()
+{
+    if (bridge.waitingResp && !bridge.deviceToHostQueue.empty()) {
+        PacketPtr pkt = bridge.deviceToHostQueue.front();
+        if (bridge.cpuSidePort.sendTimingResp(pkt)) {
+            bridge.deviceToHostQueue.pop_front();
+            bridge.waitingResp = false;
+        }
+    }
 }
 
-Tick CXLCacheBridge::MemSidePort::recvAtomic(PacketPtr pkt) {
-    return 0;
-}
-
-void CXLCacheBridge::MemSidePort::recvFunctional(PacketPtr pkt) {
-    bridge.cpuSidePort.sendFunctional(pkt);
-}
-
-void CXLCacheBridge::handleHostRequest(PacketPtr pkt) {
+void CXLCacheBridge::handleHostRequest(PacketPtr pkt)
+{
     translateToDevice(pkt);
 }
 
-void CXLCacheBridge::handleHostSnoop(PacketPtr pkt) {
+void CXLCacheBridge::handleHostSnoop(PacketPtr pkt)
+{
     translateToDevice(pkt);
 }
 
-void CXLCacheBridge::handleDeviceResponse(PacketPtr pkt) {
+void CXLCacheBridge::handleDeviceResponse(PacketPtr pkt)
+{
     translateToHost(pkt);
 }
 
-bool CXLCacheBridge::sendToDevice(PacketPtr pkt) {
+bool CXLCacheBridge::sendToDevice(PacketPtr pkt)
+{
+    // Artificial delay injection using ClockedObject
+    // For example, delay one clock cycle before sending
     schedule(new EventFunctionWrapper([this, pkt]() {
         translateToDevice(pkt);
     }, "DelayedTranslateToDevice"), clockEdge(Cycles(1)));
+
     return true;
 }
 
-void CXLCacheBridge::translateToDevice(PacketPtr pkt) {
-    switch (pkt->cmd.toInt()) {
+void CXLCacheBridge::translateToDevice(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Host → Device | Addr: %#x | Cmd: %s\n",
+            pkt->getAddr(), pkt->cmd.toString().c_str());
+
+    switch (pkt->cmd) {
         case MemCmd::ReadReq:
             pkt->cmd = MemCmd::ReadSharedReq;
             break;
-        case MemCmd::WriteReq:
         case MemCmd::ReadExReq:
+        case MemCmd::WriteReq:
         case MemCmd::UpgradeReq:
         case MemCmd::WriteLineReq:
             pkt->cmd = MemCmd::ReadUniqueReq;
             break;
+        case MemCmd::InvalidateReq:
+        case MemCmd::CleanEvict:
+        case MemCmd::WritebackDirty:
+            // no translation needed
+            break;
+        case MemCmd::Go:
+            pkt->cmd = MemCmd::Go;
+            break;
         default:
+            DPRINTF(CXLBridge, "[CXLBridge] Warning: Unhandled translation Host → Device: %s\n",
+                    pkt->cmd.toString().c_str());
             break;
     }
+
     memSidePort.sendTimingReq(pkt);
 }
 
-void CXLCacheBridge::translateToHost(PacketPtr pkt) {
-    switch (pkt->cmd.toInt()) {
+void CXLCacheBridge::translateToHost(PacketPtr pkt)
+{
+    DPRINTF(CXLBridge, "[CXLBridge] Device → Host | Addr: %#x | Cmd: %s\n",
+            pkt->getAddr(), pkt->cmd.toString().c_str());
+
+    switch (pkt->cmd) {
         case MemCmd::WritebackDirty:
             pkt->cmd = MemCmd::WriteResp;
             break;
         case MemCmd::CleanEvict:
             pkt->cmd = MemCmd::WriteCleanResp;
             break;
+        case MemCmd::ReadResp:
+            break;
+        case MemCmd::Go:
+            pkt->cmd = MemCmd::Go;
+            break;
         default:
+            DPRINTF(CXLBridge, "[CXLBridge] Warning: Unhandled translation Device → Host: %s\n",
+                    pkt->cmd.toString().c_str());
             break;
     }
+
     cpuSidePort.sendTimingResp(pkt);
 }
 
 std::deque<PacketPtr> CXLCacheBridge::hostToDeviceQueue;
 std::deque<PacketPtr> CXLCacheBridge::deviceToHostQueue;
-bool CXLCacheBridge::waitingReq = false;
-bool CXLCacheBridge::waitingResp = false;
+bool CXLCacheBridge::waitingReq;
+bool CXLCacheBridge::waitingResp;
 
 } // namespace gem5

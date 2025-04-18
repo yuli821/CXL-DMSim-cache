@@ -1,39 +1,24 @@
-#ifndef __MEM_CXL_CACHE_BRIDGE_HH__
-#define __MEM_CXL_CACHE_BRIDGE_HH__
+#ifndef __MEM_CACHE_CXL_CACHE_BRIDGE_HH__
+#define __MEM_CACHE_CXL_CACHE_BRIDGE_HH__
 
-#include "sim/clocked_object.hh"
 #include "mem/port.hh"
 #include "mem/packet.hh"
+#include "sim/clocked_object.hh"
 #include <deque>
 
 namespace gem5 {
 
-/**
- * CXLCacheBridge
- * 
- * This bridge implements support for CXL.cache protocol by translating
- * host-originating coherence traffic (ReadReq, ReadExReq, InvalidateReq, etc.)
- * to device-side requests (ReadShared, ReadUnique, etc.), and likewise
- * translating device-initiated requests (e.g., writebacks) to host-visible
- * memory system packets.
- * 
- * The bridge supports backpressure, retry logic, and cycle-based scheduling
- * using ClockedObject for artificial timing delays.
- */
 class CXLCacheBridge : public ClockedObject
 {
   public:
     CXLCacheBridge(const CXLCacheBridgeParams &p);
 
     Port &getPort(const std::string &if_name, PortID idx = InvalidPortID) override;
-
     AddrRangeList getAddrRanges() const override;
 
   protected:
-    /**
-     * Slave port connected to host coherence fabric (CoherentXBar)
-     */
-    class CPUSidePort : public SlavePort {
+    class CPUSidePort : public ResponsePort
+    {
       private:
         CXLCacheBridge &bridge;
       public:
@@ -47,10 +32,8 @@ class CXLCacheBridge : public ClockedObject
         AddrRangeList getAddrRanges() const override;
     };
 
-    /**
-     * Master port connected to CXL HMC (cache or memory-side model)
-     */
-    class MemSidePort : public MasterPort {
+    class MemSidePort : public RequestPort
+    {
       private:
         CXLCacheBridge &bridge;
       public:
@@ -83,4 +66,4 @@ class CXLCacheBridge : public ClockedObject
 
 } // namespace gem5
 
-#endif // __MEM_CXL_CACHE_BRIDGE_HH__
+#endif // __MEM_CACHE_CXL_CACHE_BRIDGE_HH__
