@@ -186,6 +186,10 @@ simulator = Simulator(
     on_exit_event={ExitEvent.EXIT: (func() for func in [processor.switch])},
 )
 
+# simulator._instantiate()
+# simulator._root.sim_quantum       = m5.ticks.fromSeconds(0.001)
+# simulator._root.preemption_quantum = m5.ticks.fromSeconds(0.0001)
+
 print("Running the simulation")
 print("Using Atomic cpu")
 

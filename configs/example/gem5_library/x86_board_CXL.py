@@ -105,61 +105,49 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                 f"ISA. Current processor ISA: '{processor.get_isa().name}'."
             )
 
+        # self.afu_iobus = IOXBar()
+
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
-        # ——————————————————————————————————————————————
         # 0) vanilla full‑system X86 setup
-        # ——————————————————————————————————————————————
         self.pc = Pc()
         self.workload = X86FsLinux()
         self.iobus = IOXBar()
-        self._setup_io_devices()  # builds self.apicbridge + self.cxl_mem_bus
+        # create AFU’s private I/O crossbar before wiring
+        self.afu_iobus = IOXBar()
         self.m5ops_base = 0xFFFF0000
 
-        # ——————————————————————————————————————————————
         # 1) extra AFU core + its interrupt controller
-        # ——————————————————————————————————————————————
         afu_id = self.get_processor().get_num_cores()
         self.afu_core = X86AtomicSimpleCPU(cpu_id=afu_id)
         self.afu_core.createThreads()
         self.afu_core.createInterruptController()
+        self._setup_io_devices()
 
         ic = self.afu_core.interrupts[0]
-        # MMIO‑style LAPIC/MMIO → I/O bus
-        ic.pio = self.iobus.mem_side_ports
-        # MSI‑style interrupts → I/O bus
+        # route AFU’s APIC MMIO & responses onto its private bus
+        ic.pio = self.afu_iobus.mem_side_ports
+        ic.int_responder = self.afu_iobus.mem_side_ports
+        # MSI‑style requests go over the main I/O bus
         ic.int_requestor = self.iobus.cpu_side_ports
-        ic.int_responder = self.iobus.mem_side_ports
 
-        # keep a Python ref so it doesn’t get GC’d
         self._afu_interrupt_ctrl = ic
 
-        # ——————————————————————————————————————————————
         # 2) define HMC vs DMC windows
-        # ——————————————————————————————————————————————
         hmc_window = AddrRange(0x0000_0000, 0x1FFF_FFFF)
         dmc_window = AddrRange(0x2000_0000, 0x2FFF_FFFF)
 
-        # ——————————————————————————————————————————————
         # 3) steer‑by‑address XBar + two private L2s
-        # ——————————————————————————————————————————————
-        # self.afu_steer_xbar = CoherentXBar(
-        #     width                  = 16,
-        #     forward_latency        = 1,
-        #     response_latency       = 1,
-        #     snoop_response_latency = 1,
-        #     frontend_latency       = 1,
-        # )
-        self.afu_steer_xbar = BaseXBar(
+        self.afu_steer_xbar = CoherentXBar(
             forward_latency=1,
             response_latency=1,
+            width=16,
+            snoop_response_latency=1,
+            frontend_latency=1,
         )
-
-        # hook AFU’s I/D caches to the steer‑xbar
         self.afu_core.icache_port = self.afu_steer_xbar.cpu_side_ports
         self.afu_core.dcache_port = self.afu_steer_xbar.cpu_side_ports
 
-        # HMC‐side L2 → normal host DDR path
         self.afu_hmc_l2 = Cache(
             size="256kB",
             assoc=8,
@@ -173,7 +161,6 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_hmc_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
         self.afu_hmc_l2.mem_side = self.cache_hierarchy.get_cpu_side_port()
 
-        # CXL‐side L2 → CXLMemBar
         self.afu_cxl_l2 = Cache(
             size="256kB",
             assoc=8,
@@ -187,26 +174,11 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_cxl_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
         self.afu_cxl_l2.mem_side = self.cxl_mem_bus.cpu_side_ports
 
-        # keep refs so Python doesn’t drop them
         self._afu_l2_subsystem = [
             self.afu_steer_xbar,
             self.afu_hmc_l2,
             self.afu_cxl_l2,
         ]
-
-        # ——————————————————————————————————————————————
-        # 4) advertise the AFU in the MP table
-        # ——————————————————————————————————————————————
-        self.workload.intel_mp_table.base_entries.append(
-            X86IntelMPProcessor(
-                local_apic_id=afu_id,
-                local_apic_version=0x14,
-                enable=True,
-                bootstrap=False,
-                eventq_index=afu_id,
-            )
-        )
-        # self._finish_mp_and_e820()
 
     def _setup_io_devices(self):
         """Sets up the x86 IO devices.
@@ -302,7 +274,14 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                     - 1,
                 )
             ]
-            self.pc.attachIO(self.get_io_bus())
+            self.pc.attachIO(self.afu_iobus, [self.afu_core.interrupts[0].pio])
+
+        self.afu_bus_bridge = Bridge(delay="50ns")
+        self.afu_bus_bridge.cpu_side_port = self.afu_iobus.mem_side_ports
+        self.afu_bus_bridge.mem_side_port = (
+            self.get_cache_hierarchy().get_cpu_side_port()
+        )
+        self.afu_bus_bridge.ranges = [AddrRange(0xA0010000, size=0x1000)]
 
         # Add in a Bios information structure.
         self.workload.smbios_table.structures = [X86SMBiosBiosInformation()]
@@ -310,14 +289,30 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         # Set up the Intel MP table
         base_entries = []
         ext_entries = []
+
+        # CPU cores
         for i in range(self.get_processor().get_num_cores()):
-            bp = X86IntelMPProcessor(
-                local_apic_id=i,
+            base_entries.append(
+                X86IntelMPProcessor(
+                    local_apic_id=i,
+                    local_apic_version=0x14,
+                    enable=True,
+                    bootstrap=(i == 0),
+                )
+            )
+
+        # AFU core
+        afu_id = self.get_processor().get_num_cores()
+        base_entries.append(
+            X86IntelMPProcessor(
+                local_apic_id=afu_id,
                 local_apic_version=0x14,
                 enable=True,
-                bootstrap=(i == 0),
+                bootstrap=False,
+                eventq_index=afu_id,
             )
-            base_entries.append(bp)
+        )
+
         io_apic = X86IntelMPIOAPIC(
             id=self.get_processor().get_num_cores(),
             version=0x11,
