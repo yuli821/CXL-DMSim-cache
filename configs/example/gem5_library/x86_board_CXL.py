@@ -169,7 +169,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_l2bus.cpu_side_ports = self.afu_l1d_cache.mem_side
         self.afu_l2bus.mem_side_ports = self.afu_hmc.cpu_side
         self.afu_l2bus.mem_side_ports = self.afu_dmc.cpu_side
-        self.get_cache_hierarchy().get_cpu_side_port() = self.afu_hmc.mem_side
+        self.cache_hierarchy.cpu_side_ports = self.afu_hmc.mem_side
         self.cxl_mem_bus.cpu_side_ports = self.afu_dmc.mem_side
 
 
