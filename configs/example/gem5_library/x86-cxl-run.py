@@ -188,7 +188,7 @@ board.set_kernel_disk_workload(
 riscv_bin = "/home/yuli9/CXL-DMSim/FFT"
 afu_proc = Process()
 afu_proc.cmd= [riscv_bin, "-p1","-m16"]
-board.afu.wordload = afu_proc
+board.afu.core.wordload = afu_proc
 # board.afu.createThreads()
 SEWorkload.init_compatible(riscv_bin)
 
