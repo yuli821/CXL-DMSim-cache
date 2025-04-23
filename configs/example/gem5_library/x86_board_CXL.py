@@ -46,6 +46,7 @@ from m5.objects import (  # I'm adding this to add CPU and Cache
     L2XBar,
     Pc,
     Port,
+    Process,
     RawDiskImage,
     # X86AtomicSimpleCPU,
     X86E820Entry,

@@ -62,11 +62,15 @@ from gem5.simulate.exit_event import ExitEvent
 from gem5.simulate.simulator import Simulator
 from gem5.utils.requires import requires
 
+from m5.objects import Process
+from m5.objects import SEWorkload
+
+
 # This runs a check to ensure the gem5 binary is compiled to X86 and to the
 # MESI Three Level coherence protocol.
-requires(
-    isa_required=ISA.X86,
-)
+# requires(
+#     isa_required=ISA.X86,
+# )
 from gem5.components.cachehierarchies.classic.private_l1_private_l2_shared_l3_cache_hierarchy import (
     PrivateL1PrivateL2SharedL3CacheHierarchy,
 )
@@ -180,6 +184,13 @@ board.set_kernel_disk_workload(
     disk_image=DiskImageResource(local_path="/home/soonha1008/parsec.img"),
     readfile_contents=command,
 )
+
+riscv_bin = "../../../FFT -p1 -m16"
+afu_proc = Process()
+afu_proc.cmd= [riscv_bin]
+board.afu.wordload = afu_proc
+board.afu.createThreads()
+SEWorkload.init_compatible(riscv_bin)
 
 simulator = Simulator(
     board=board,
