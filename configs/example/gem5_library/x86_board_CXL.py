@@ -43,10 +43,11 @@ from m5.objects import (  # I'm adding this to add CPU and Cache
     CXLMemBar,
     IdeDisk,
     IOXBar,
+    L2XBar,
     Pc,
     Port,
     RawDiskImage,
-    X86AtomicSimpleCPU,
+    # X86AtomicSimpleCPU,
     X86E820Entry,
     X86FsLinux,
     X86IntelMPBus,
@@ -65,6 +66,12 @@ from gem5.components.boards.se_binary_workload import SEBinaryWorkload
 from gem5.components.cachehierarchies.abstract_cache_hierarchy import (
     AbstractCacheHierarchy,
 )
+from gem5.components.processors.simple_core import (
+    SimpleCore,
+)
+from gem5.components.cachehierarchies.classic.caches.l1dcache import L1DCache
+from gem5.components.cachehierarchies.classic.caches.l1icache import L1ICache
+from gem5.components.processors.cpu_types import CPUTypes
 from gem5.components.memory.abstract_memory_system import AbstractMemorySystem
 from gem5.components.processors.abstract_processor import AbstractProcessor
 from gem5.isas import ISA
@@ -109,76 +116,62 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
 
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
-        # 0) vanilla full‑system X86 setup
         self.pc = Pc()
-        self.workload = X86FsLinux()
-        self.iobus = IOXBar()
-        # create AFU’s private I/O crossbar before wiring
-        self.afu_iobus = IOXBar()
-        self.m5ops_base = 0xFFFF0000
 
-        # 1) extra AFU core + its interrupt controller
-        afu_id = self.get_processor().get_num_cores()
-        self.afu_core = X86AtomicSimpleCPU(cpu_id=afu_id)
-        self.afu_core.createThreads()
-        self.afu_core.createInterruptController()
+        self.workload = X86FsLinux()
+
+        # North Bridge
+        self.iobus = IOXBar()
+
+        # Set up all of the I/O.
         self._setup_io_devices()
 
-        ic = self.afu_core.interrupts[0]
-        # route AFU’s APIC MMIO & responses onto its private bus
-        ic.pio = self.afu_iobus.mem_side_ports
-        ic.int_responder = self.afu_iobus.mem_side_ports
-        # MSI‑style requests go over the main I/O bus
-        ic.int_requestor = self.iobus.cpu_side_ports
+        self.m5ops_base = 0xFFFF0000
 
-        self._afu_interrupt_ctrl = ic
+        self._setup_cxl_type2_device()
 
-        # 2) define HMC vs DMC windows
-        hmc_window = AddrRange(0x0000_0000, 0x1FFF_FFFF)
-        dmc_window = AddrRange(0x2000_0000, 0x2FFF_FFFF)
-
-        # 3) steer‑by‑address XBar + two private L2s
-        self.afu_steer_xbar = CoherentXBar(
-            forward_latency=1,
+    def _setup_cxl_type2_device(self):
+        # setup an core
+        hmc_addrRangeList = [ctrl.range for ctrl in self.get_memory().get_memory_controllers()]
+        dmc_addrRangeList = [ctrl.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
+        self.afu = SimpleCore(cpu_type=CPUTypes.TIMING, isa=ISA.X86,core_id=0)
+        self.afu_l1i_cache=L1ICache(size="32kB")
+        self.afu_l1d_cache=L1DCache(size="48kB")
+        self.afu_l2bus=L2XBar()
+        self.afu_hmc=Cache(
+            assoc=16,
+            tag_latency=10,
+            data_latency=10,
             response_latency=1,
-            width=16,
-            snoop_response_latency=1,
-            frontend_latency=1,
-        )
-        self.afu_core.icache_port = self.afu_steer_xbar.cpu_side_ports
-        self.afu_core.dcache_port = self.afu_steer_xbar.cpu_side_ports
+            mshrs=20,
+            size="2MB",
+            tgts_per_mshr=12,
+            write_buffers=32,
+            writeback_clean=False,
+            clusivity="mostly_excl",
+            addr_ranges=hmc_addrRangeList)
+        self.afu_dmc=Cache(
+            assoc=16,
+            tag_latency=50,
+            data_latency=50,
+            response_latency=50,
+            mshrs=32,
+            size="2MB",
+            tgts_per_mshr=12,
+            write_buffers=32,
+            writeback_clean=False,
+            clusivity="mostly_excl",
+            addr_ranges=dmc_addrRangeList,)
+        #connection
+        self.afu.connect_icache(self.afu_l1i_cache.cpu_side)
+        self.afu.connect_dcache(self.afu_l1i_cache.cpu_side)
+        self.afu_l2bus.cpu_side_ports = self.afu_l1i_cache.mem_side
+        self.afu_l2bus.cpu_side_ports = self.afu_l1d_cache.mem_side
+        self.afu_l2bus.mem_side_ports = self.afu_hmc.cpu_side
+        self.afu_l2bus.mem_side_ports = self.afu_dmc.cpu_side
+        self.get_cache_hierarchy().get_cpu_side_port() = self.afu_hmc.mem_side
+        self.cxl_mem_bus.cpu_side_ports = self.afu_dmc.mem_side
 
-        self.afu_hmc_l2 = Cache(
-            size="256kB",
-            assoc=8,
-            tag_latency=4,
-            data_latency=4,
-            response_latency=2,
-            mshrs=16,
-            tgts_per_mshr=8,
-            addr_ranges=[hmc_window],
-        )
-        self.afu_hmc_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
-        self.afu_hmc_l2.mem_side = self.cache_hierarchy.get_cpu_side_port()
-
-        self.afu_cxl_l2 = Cache(
-            size="256kB",
-            assoc=8,
-            tag_latency=4,
-            data_latency=4,
-            response_latency=2,
-            mshrs=16,
-            tgts_per_mshr=8,
-            addr_ranges=[dmc_window],
-        )
-        self.afu_cxl_l2.cpu_side = self.afu_steer_xbar.mem_side_ports
-        self.afu_cxl_l2.mem_side = self.cxl_mem_bus.cpu_side_ports
-
-        self._afu_l2_subsystem = [
-            self.afu_steer_xbar,
-            self.afu_hmc_l2,
-            self.afu_cxl_l2,
-        ]
 
     def _setup_io_devices(self):
         """Sets up the x86 IO devices.
@@ -197,13 +190,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
 
         # Setup memory system specific settings.
         if self.get_cache_hierarchy().is_ruby():
-            self.pc.attachIO(
-                self.get_io_bus(),
-                [
-                    self.pc.south_bridge.ide.dma,
-                    self.pc.south_bridge.cxlmemory.dma,
-                ],
-            )
+            self.pc.attachIO(self.get_io_bus(), [self.pc.south_bridge.ide.dma, self.pc.south_bridge.cxlmemory.dma])
         else:
             # # Constants similar to x86_traits.hh
             IO_address_space_base = 0x8000000000000000
@@ -212,12 +199,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             APIC_range_size = 1 << 12
 
             # Configure CXLBridge
-            self.bridge = CXLBridge(
-                bridge_lat="50ns",
-                proto_proc_lat="12ns",
-                req_fifo_depth=128,
-                resp_fifo_depth=128,
-            )
+            self.bridge = CXLBridge(bridge_lat="50ns", proto_proc_lat="12ns", req_fifo_depth=128, resp_fifo_depth=128)
             self.bridge.mem_side_port = self.get_io_bus().cpu_side_ports
             self.bridge.cpu_side_port = (
                 self.get_cache_hierarchy().get_mem_side_port()
@@ -234,9 +216,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             # Configure CXL Device
             cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            cxl_mem_range = AddrRange(
-                Addr(cxl_mem_start), size=cxl_dram.get_size()
-            )
+            cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
             self.bridge.ranges.append(cxl_mem_range)
             self.pc.south_bridge.cxlmemory.cxl_mem_range = cxl_mem_range
             cxl_dram.set_memory_range([cxl_mem_range])
@@ -245,9 +225,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                 cxl_abstract_mems.append(mc.dram)
             self.memories.extend(cxl_abstract_mems)
             self.cxl_mem_bus = CXLMemBar()
-            self.cxl_mem_bus.cpu_side_ports = (
-                self.pc.south_bridge.cxlmemory.mem_req_port
-            )
+            self.cxl_mem_bus.cpu_side_ports = self.pc.south_bridge.cxlmemory.mem_req_port
             for _, port in cxl_dram.get_mem_ports():
                 self.cxl_mem_bus.mem_side_ports = port
 
@@ -274,14 +252,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                     - 1,
                 )
             ]
-            self.pc.attachIO(self.afu_iobus, [self.afu_core.interrupts[0].pio])
-
-        self.afu_bus_bridge = Bridge(delay="50ns")
-        self.afu_bus_bridge.cpu_side_port = self.afu_iobus.mem_side_ports
-        self.afu_bus_bridge.mem_side_port = (
-            self.get_cache_hierarchy().get_cpu_side_port()
-        )
-        self.afu_bus_bridge.ranges = [AddrRange(0xA0010000, size=0x1000)]
+            self.pc.attachIO(self.get_io_bus())
 
         # Add in a Bios information structure.
         self.workload.smbios_table.structures = [X86SMBiosBiosInformation()]
@@ -289,30 +260,14 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         # Set up the Intel MP table
         base_entries = []
         ext_entries = []
-
-        # CPU cores
         for i in range(self.get_processor().get_num_cores()):
-            base_entries.append(
-                X86IntelMPProcessor(
-                    local_apic_id=i,
-                    local_apic_version=0x14,
-                    enable=True,
-                    bootstrap=(i == 0),
-                )
-            )
-
-        # AFU core
-        afu_id = self.get_processor().get_num_cores()
-        base_entries.append(
-            X86IntelMPProcessor(
-                local_apic_id=afu_id,
+            bp = X86IntelMPProcessor(
+                local_apic_id=i,
                 local_apic_version=0x14,
                 enable=True,
-                bootstrap=False,
-                eventq_index=afu_id,
+                bootstrap=(i == 0),
             )
-        )
-
+            base_entries.append(bp)
         io_apic = X86IntelMPIOAPIC(
             id=self.get_processor().get_num_cores(),
             version=0x11,
@@ -392,11 +347,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             X86E820Entry(addr=0xFFFF0000, size="64kB", range_type=2)
         )
 
-        entries.append(
-            X86E820Entry(
-                addr=0x100000000, size=f"{cxl_mem_range.size()}B", range_type=1
-            )
-        )
+        entries.append(X86E820Entry(addr=0x100000000, size=f"{cxl_mem_range.size()}B", range_type=1))
 
         self.workload.e820_table.entries = entries
 
@@ -414,11 +365,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
 
     @overrides(AbstractSystemBoard)
     def get_dma_ports(self) -> Sequence[Port]:
-        return [
-            self.pc.south_bridge.ide.dma,
-            self.iobus.mem_side_ports,
-            self.pc.south_bridge.cxlmemory.dma,
-        ]
+        return [self.pc.south_bridge.ide.dma, self.iobus.mem_side_ports, self.pc.south_bridge.cxlmemory.dma]
 
     @overrides(AbstractSystemBoard)
     def has_coherent_io(self) -> bool:
@@ -474,3 +421,4 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             "root={root_value}",
             "disk_device={disk_device}",
         ]
+
