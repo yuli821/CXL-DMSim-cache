@@ -180,8 +180,8 @@ command = (
 
 # Please modify the paths of kernel and disk_image according to the location of your files.
 board.set_kernel_disk_workload(
-    kernel=KernelResource(local_path="/home/soonha1008/vmlinux_20240920"),
-    disk_image=DiskImageResource(local_path="/home/soonha1008/parsec.img"),
+    kernel=KernelResource(local_path="/home/yuli9/code/fsimage/vmlinux_20240920"),
+    disk_image=DiskImageResource(local_path="/home/yuli9/code/fsimage/parsec.img"),
     readfile_contents=command,
 )
 
