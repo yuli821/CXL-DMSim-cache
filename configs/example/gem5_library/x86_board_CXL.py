@@ -135,8 +135,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
         self.afu = SimpleCore(cpu_type=CPUTypes.TIMING, isa=ISA.X86,core_id=0)
-        self.afu_l1i_cache=L1ICache(size="32kB")
-        self.afu_l1d_cache=L1DCache(size="48kB")
+        self.afu_l1i_cache=L1ICache(size="32kB", assoc=8)
+        self.afu_l1d_cache=L1DCache(size="48kB", assoc=6)
         self.afu_l2bus=L2XBar()
         self.afu_hmc=Cache(
             assoc=16,
