@@ -164,7 +164,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             addr_ranges=dmc_addrRangeList,)
         #connection
         self.afu.connect_icache(self.afu_l1i_cache.cpu_side)
-        self.afu.connect_dcache(self.afu_l1i_cache.cpu_side)
+        self.afu.connect_dcache(self.afu_l1d_cache.cpu_side)
         self.afu_l2bus.cpu_side_ports = self.afu_l1i_cache.mem_side
         self.afu_l2bus.cpu_side_ports = self.afu_l1d_cache.mem_side
         self.afu_l2bus.mem_side_ports = self.afu_hmc.cpu_side
