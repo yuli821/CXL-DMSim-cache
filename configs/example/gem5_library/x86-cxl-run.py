@@ -189,7 +189,7 @@ riscv_bin = "../../../FFT -p1 -m16"
 afu_proc = Process()
 afu_proc.cmd= [riscv_bin]
 board.afu.wordload = afu_proc
-board.afu.createThreads()
+# board.afu.createThreads()
 SEWorkload.init_compatible(riscv_bin)
 
 simulator = Simulator(
