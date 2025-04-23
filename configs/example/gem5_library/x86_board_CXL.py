@@ -134,7 +134,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         # setup an core
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
-        self.afu = SimpleCore(cpu_type=CPUTypes.TIMING, isa=ISA.X86,core_id=0)
+        self.afu = SimpleCore(cpu_type=CPUTypes.TIMING, isa=ISA.RISCV,core_id=0)
         self.afu_l1i_cache=L1ICache(size="32kB", assoc=8)
         self.afu_l1d_cache=L1DCache(size="48kB", assoc=6)
         self.afu_l2bus=L2XBar()
@@ -165,12 +165,12 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         #connection
         self.afu.connect_icache(self.afu_l1i_cache.cpu_side)
         self.afu.connect_dcache(self.afu_l1d_cache.cpu_side)
-        self.afu_l2bus.cpu_side_ports = self.afu_l1i_cache.mem_side
-        self.afu_l2bus.cpu_side_ports = self.afu_l1d_cache.mem_side
-        self.afu_l2bus.mem_side_ports = self.afu_hmc.cpu_side
-        self.afu_l2bus.mem_side_ports = self.afu_dmc.cpu_side
-        self.cache_hierarchy.membus.cpu_side_ports = self.afu_hmc.mem_side
-        self.cxl_mem_bus.cpu_side_ports = self.afu_dmc.mem_side
+        self.afu_l1i_cache.mem_side = self.afu_l2bus.cpu_side_ports
+        self.afu_l1d_cache.mem_side = self.afu_l2bus.cpu_side_ports
+        self.afu_hmc.cpu_side = self.afu_l2bus.mem_side_ports
+        self.afu_dmc.cpu_side = self.afu_l2bus.mem_side_ports
+        self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
+        self.afu_dmc.mem_side = self.cxl_mem_bus.cpu_side_ports
 
 
     def _setup_io_devices(self):
