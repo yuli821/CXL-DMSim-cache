@@ -132,8 +132,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
 
     def _setup_cxl_type2_device(self):
         # setup an core
-        hmc_addrRangeList = [ctrl.range for ctrl in self.get_memory().get_memory_controllers()]
-        dmc_addrRangeList = [ctrl.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
+        hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
+        dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
         self.afu = SimpleCore(cpu_type=CPUTypes.TIMING, isa=ISA.X86,core_id=0)
         self.afu_l1i_cache=L1ICache(size="32kB")
         self.afu_l1d_cache=L1DCache(size="48kB")
