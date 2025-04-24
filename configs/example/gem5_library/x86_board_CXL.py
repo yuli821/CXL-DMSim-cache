@@ -325,7 +325,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             min_addr=0x100000000,
             max_addr=0x100000000 + self.get_cxl_memory().get_size(),
             block_size=64,
-            read_percent=60  # 60% reads, 40% writes
+            rd_perc=60  # 60% reads, 40% writes
         )
         self.afu_hmc=Cache(
             assoc=16,
