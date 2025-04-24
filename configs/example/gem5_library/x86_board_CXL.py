@@ -110,7 +110,9 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
                 "The X86Board requires a processor using the X86 "
                 f"ISA. Current processor ISA: '{processor.get_isa().name}'."
             )
-        # self.afu_iobus = IOXBar()
+        cxl_mem_start = 0x100000000
+        cxl_dram = self.get_cxl_memory()
+        self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
 
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
@@ -169,9 +171,9 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             ]
 
             # Configure CXL Device
-            cxl_mem_start = 0x100000000
+            # cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
+            # self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
             self.bridge.ranges.append(self.cxl_mem_range)
             self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
             cxl_dram.set_memory_range([self.cxl_mem_range])
@@ -305,6 +307,7 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
         entries.append(X86E820Entry(addr=0x100000000, size=f"{self.cxl_mem_range.size()}B", range_type=1))
 
         self.workload.e820_table.entries = entries
+
     def _setup_cxl_type2_device(self):
         # setup an core
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
