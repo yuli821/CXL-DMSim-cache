@@ -110,9 +110,6 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
                 "The X86Board requires a processor using the X86 "
                 f"ISA. Current processor ISA: '{processor.get_isa().name}'."
             )
-        cxl_mem_start = 0x100000000
-        cxl_dram = self.get_cxl_memory()
-        self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
 
     @overrides(AbstractSystemBoard)
     def _setup_board(self) -> None:
@@ -171,9 +168,9 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             ]
 
             # Configure CXL Device
-            # cxl_mem_start = 0x100000000
+            cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            # self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
+            self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
             self.bridge.ranges.append(self.cxl_mem_range)
             self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
             cxl_dram.set_memory_range([self.cxl_mem_range])
@@ -323,7 +320,7 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
         )
         self.afu_device = RandomGenerator(
             duration='5s',
-            min_addr=self.cxl_mem_range.start(),
+            min_addr=0x100000000,
             max_addr=self.cxl_mem_range.end(),
             block_size=64,
             min_period='10ns',
