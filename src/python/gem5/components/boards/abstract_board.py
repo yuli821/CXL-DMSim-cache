@@ -37,6 +37,7 @@ from typing import (
 )
 
 from m5.objects import (
+    Addr,
     AddrRange,
     ClockDomain,
     IOXBar,
@@ -109,7 +110,7 @@ class AbstractBoard:
 
         # Set the CXL memory size and whether the device is an ASIC or not.
         self.cxl_memory = cxl_memory
-        self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=self.cxl_memory.get_size())
+        self.cxl_mem_range = AddrRange(Addr(0x0), size=self.cxl_memory.get_size())
         self._is_asic = is_asic
         # This variable determines whether the board is to be executed in
         # full-system or syscall-emulation mode. This is set when the workload
