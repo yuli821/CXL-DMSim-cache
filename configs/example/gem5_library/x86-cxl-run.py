@@ -147,7 +147,7 @@ processor = SimpleSwitchableProcessor(
     starting_core_type=CPUTypes.ATOMIC,
     switch_core_type=CPUTypes.O3 if args.cpu_type == "O3" else CPUTypes.TIMING,
     isa=ISA.X86,
-    num_cores=args.num_cpus,
+    num_cores=args.num_cpus, #last cpu is the afu core
 )
 
 # Here we setup the board and CXL device memory size. The X86Board allows for Full-System X86 simulations.
@@ -184,13 +184,6 @@ board.set_kernel_disk_workload(
     disk_image=DiskImageResource(local_path="/home/yuli9/code/fsimage/parsec.img"),
     readfile_contents=command,
 )
-
-riscv_bin = "/home/yuli9/CXL-DMSim/FFT"
-afu_proc = Process()
-afu_proc.cmd= [riscv_bin, "-p1","-m16"]
-board.afu.core.workload = afu_proc
-# board.afu.createThreads()
-SEWorkload.init_compatible(riscv_bin)
 
 simulator = Simulator(
     board=board,

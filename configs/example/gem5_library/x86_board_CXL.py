@@ -67,9 +67,7 @@ from gem5.components.boards.se_binary_workload import SEBinaryWorkload
 from gem5.components.cachehierarchies.abstract_cache_hierarchy import (
     AbstractCacheHierarchy,
 )
-from gem5.components.processors.simple_core import (
-    SimpleCore,
-)
+from gem5.components.processors.random_generator import RandomGenerator
 from gem5.components.cachehierarchies.classic.caches.l1dcache import L1DCache
 from gem5.components.cachehierarchies.classic.caches.l1icache import L1ICache
 from gem5.components.processors.cpu_types import CPUTypes
@@ -80,7 +78,7 @@ from gem5.resources.resource import AbstractResource
 from gem5.utils.override import overrides
 
 
-class X86Board(AbstractSystemBoard, KernelDiskWorkload):
+class X86Board(AbstractSystemBoard, SEBinaryWorkload):
     """
     A board capable of full system simulation for X86.
 
@@ -112,7 +110,6 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                 "The X86Board requires a processor using the X86 "
                 f"ISA. Current processor ISA: '{processor.get_isa().name}'."
             )
-
         # self.afu_iobus = IOXBar()
 
     @overrides(AbstractSystemBoard)
@@ -135,10 +132,24 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         # setup an core
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
-        self.afu = SimpleCore(cpu_type=CPUTypes.TIMING, isa=ISA.RISCV,core_id=0)
-        self.afu_l1i_cache=L1ICache(size="32kB", assoc=8)
-        self.afu_l1d_cache=L1DCache(size="48kB", assoc=6)
-        self.afu_l2bus=L2XBar()
+        self.afu_hmc = RandomGenerator(
+            duration='5s',
+            min_addr=self.mem_ranges[0].start(),
+            max_addr=self.mem_ranges[0].end(),
+            block_size=64,
+            min_period='10ns',
+            max_period='10ns',
+            read_percent=60  # 60% reads, 40% writes
+        )
+        self.afu_dmc = RandomGenerator(
+            duration='5s',
+            min_addr=self.cxl_mem_start,
+            max_addr=self.cxl_mem_range.end(),
+            block_size=64,
+            min_period='10ns',
+            max_period='10ns',
+            read_percent=60  # 60% reads, 40% writes
+        )
         self.afu_hmc=Cache(
             assoc=16,
             tag_latency=10,
@@ -164,12 +175,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             clusivity="mostly_excl",
             addr_ranges=dmc_addrRangeList,)
         #connection
-        self.afu.connect_icache(self.afu_l1i_cache.cpu_side)
-        self.afu.connect_dcache(self.afu_l1d_cache.cpu_side)
-        self.afu_l1i_cache.mem_side = self.afu_l2bus.cpu_side_ports
-        self.afu_l1d_cache.mem_side = self.afu_l2bus.cpu_side_ports
-        self.afu_hmc.cpu_side = self.afu_l2bus.mem_side_ports
-        self.afu_dmc.cpu_side = self.afu_l2bus.mem_side_ports
+        self.afu_hmc.cpu_side = self.afu_hmc.port
+        self.afu_dmc.cpu_side = self.afu_dmc.port
         self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
         self.afu_dmc.mem_side = self.cxl_mem_bus.cpu_side_ports
 
@@ -215,12 +222,12 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             ]
 
             # Configure CXL Device
-            cxl_mem_start = 0x100000000
+            self.cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
-            self.bridge.ranges.append(cxl_mem_range)
-            self.pc.south_bridge.cxlmemory.cxl_mem_range = cxl_mem_range
-            cxl_dram.set_memory_range([cxl_mem_range])
+            self.cxl_mem_range = AddrRange(Addr(self.cxl_mem_start), size=cxl_dram.get_size())
+            self.bridge.ranges.append(self.cxl_mem_range)
+            self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
+            cxl_dram.set_memory_range([self.cxl_mem_range])
             cxl_abstract_mems = []
             for mc in cxl_dram.get_memory_controllers():
                 cxl_abstract_mems.append(mc.dram)
