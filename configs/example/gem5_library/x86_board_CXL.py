@@ -128,59 +128,6 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
 
         self._setup_cxl_type2_device()
 
-    def _setup_cxl_type2_device(self):
-        # setup an core
-        hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
-        dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
-        self.afu_hmc = RandomGenerator(
-            duration='5s',
-            min_addr=self.mem_ranges[0].start(),
-            max_addr=self.mem_ranges[0].end(),
-            block_size=64,
-            min_period='10ns',
-            max_period='10ns',
-            read_percent=60  # 60% reads, 40% writes
-        )
-        self.afu_dmc = RandomGenerator(
-            duration='5s',
-            min_addr=self.cxl_mem_start,
-            max_addr=self.cxl_mem_range.end(),
-            block_size=64,
-            min_period='10ns',
-            max_period='10ns',
-            read_percent=60  # 60% reads, 40% writes
-        )
-        self.afu_hmc=Cache(
-            assoc=16,
-            tag_latency=10,
-            data_latency=10,
-            response_latency=1,
-            mshrs=20,
-            size="2MB",
-            tgts_per_mshr=12,
-            write_buffers=32,
-            writeback_clean=False,
-            clusivity="mostly_excl",
-            addr_ranges=hmc_addrRangeList)
-        self.afu_dmc=Cache(
-            assoc=16,
-            tag_latency=50,
-            data_latency=50,
-            response_latency=50,
-            mshrs=32,
-            size="2MB",
-            tgts_per_mshr=12,
-            write_buffers=32,
-            writeback_clean=False,
-            clusivity="mostly_excl",
-            addr_ranges=dmc_addrRangeList,)
-        #connection
-        self.afu_hmc.cpu_side = self.afu_hmc.port
-        self.afu_dmc.cpu_side = self.afu_dmc.port
-        self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
-        self.afu_dmc.mem_side = self.cxl_mem_bus.cpu_side_ports
-
-
     def _setup_io_devices(self):
         """Sets up the x86 IO devices.
 
@@ -355,9 +302,60 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             X86E820Entry(addr=0xFFFF0000, size="64kB", range_type=2)
         )
 
-        entries.append(X86E820Entry(addr=0x100000000, size=f"{cxl_mem_range.size()}B", range_type=1))
+        entries.append(X86E820Entry(addr=0x100000000, size=f"{self.cxl_mem_range.size()}B", range_type=1))
 
         self.workload.e820_table.entries = entries
+    def _setup_cxl_type2_device(self):
+        # setup an core
+        hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
+        dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
+        self.afu_hmc = RandomGenerator(
+            duration='5s',
+            min_addr=self.mem_ranges[0].start(),
+            max_addr=self.mem_ranges[0].end(),
+            block_size=64,
+            min_period='10ns',
+            max_period='10ns',
+            read_percent=60  # 60% reads, 40% writes
+        )
+        self.afu_dmc = RandomGenerator(
+            duration='5s',
+            min_addr=self.cxl_mem_start,
+            max_addr=self.cxl_mem_range.end(),
+            block_size=64,
+            min_period='10ns',
+            max_period='10ns',
+            read_percent=60  # 60% reads, 40% writes
+        )
+        self.afu_hmc=Cache(
+            assoc=16,
+            tag_latency=10,
+            data_latency=10,
+            response_latency=1,
+            mshrs=20,
+            size="2MB",
+            tgts_per_mshr=12,
+            write_buffers=32,
+            writeback_clean=False,
+            clusivity="mostly_excl",
+            addr_ranges=hmc_addrRangeList)
+        self.afu_dmc=Cache(
+            assoc=16,
+            tag_latency=50,
+            data_latency=50,
+            response_latency=50,
+            mshrs=32,
+            size="2MB",
+            tgts_per_mshr=12,
+            write_buffers=32,
+            writeback_clean=False,
+            clusivity="mostly_excl",
+            addr_ranges=dmc_addrRangeList,)
+        #connection
+        self.afu_hmc.cpu_side = self.afu_hmc.port
+        self.afu_dmc.cpu_side = self.afu_dmc.port
+        self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
+        self.afu_dmc.mem_side = self.cxl_mem_bus.cpu_side_ports
 
     @overrides(AbstractSystemBoard)
     def has_io_bus(self) -> bool:
