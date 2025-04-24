@@ -310,21 +310,21 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
         self.afu_host = RandomGenerator(
+            num_cores = 1,
             duration='5s',
+            rate="250MB/s",
             min_addr=0x0,
             max_addr=self.get_memory().get_size(),
             block_size=64,
-            min_period='10ns',
-            max_period='10ns',
-            read_percent=60  # 60% reads, 40% writes
+            rd_perc=60  # 60% reads, 40% writes
         )
         self.afu_device = RandomGenerator(
+             num_cores = 1,
             duration='5s',
+            rate="250MB/s",
             min_addr=0x100000000,
             max_addr=0x100000000 + self.get_cxl_memory().get_size(),
             block_size=64,
-            min_period='10ns',
-            max_period='10ns',
             read_percent=60  # 60% reads, 40% writes
         )
         self.afu_hmc=Cache(
