@@ -104,6 +104,9 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             cxl_memory=cxl_memory,
             is_asic=is_asic,
         )
+        cxl_mem_start = 0x100000000
+        cxl_dram = self.get_cxl_memory()
+        self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
 
         if self.get_processor().get_isa() != ISA.X86:
             raise Exception(
@@ -168,9 +171,9 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             ]
 
             # Configure CXL Device
-            cxl_mem_start = 0x100000000
+            # cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
+            # self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
             self.bridge.ranges.append(self.cxl_mem_range)
             self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
             cxl_dram.set_memory_range([self.cxl_mem_range])
