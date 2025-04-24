@@ -312,7 +312,7 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
         # setup an core
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
-        self.afu_hmc = RandomGenerator(
+        self.afu_host = RandomGenerator(
             duration='5s',
             min_addr=self.mem_ranges[0].start(),
             max_addr=self.mem_ranges[0].end(),
@@ -321,7 +321,7 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             max_period='10ns',
             read_percent=60  # 60% reads, 40% writes
         )
-        self.afu_dmc = RandomGenerator(
+        self.afu_device = RandomGenerator(
             duration='5s',
             min_addr=self.cxl_mem_range.start(),
             max_addr=self.cxl_mem_range.end(),
@@ -355,8 +355,8 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             clusivity="mostly_excl",
             addr_ranges=dmc_addrRangeList,)
         #connection
-        self.afu_hmc.cpu_side = self.afu_hmc.port
-        self.afu_dmc.cpu_side = self.afu_dmc.port
+        self.afu_hmc.cpu_side = self.afu_host.port
+        self.afu_dmc.cpu_side = self.afu_device.port
         self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
         self.afu_dmc.mem_side = self.cxl_mem_bus.cpu_side_ports
 
