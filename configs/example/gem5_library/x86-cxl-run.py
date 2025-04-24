@@ -185,11 +185,14 @@ board.set_kernel_disk_workload(
     readfile_contents=command,
 )
 
+def start_generator():
+    board.afu_host.start(board.createRandomTraffic(board.afu_host))
+    board.afu_device.start(board.createRandomTraffic(board.afu_device))
+
 simulator = Simulator(
     board=board,
-    on_exit_event={ExitEvent.EXIT: (func() for func in [processor.switch])},
+    on_exit_event={ExitEvent.EXIT: (func() for func in [processor.switch, start_generator])},
 )
-
 # simulator._instantiate()
 # simulator._root.sim_quantum       = m5.ticks.fromSeconds(0.001)
 # simulator._root.preemption_quantum = m5.ticks.fromSeconds(0.0001)

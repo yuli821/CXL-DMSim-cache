@@ -30,34 +30,7 @@ from typing import (
     Sequence,
 )
 
-from m5.objects import (  # I'm adding this to add CPU and Cache
-    X86ISA,
-    Addr,
-    AddrRange,
-    BaseXBar,
-    Bridge,
-    Cache,
-    CoherentXBar,
-    CowDiskImage,
-    CXLBridge,
-    CXLMemBar,
-    IdeDisk,
-    IOXBar,
-    L2XBar,
-    Pc,
-    Port,
-    Process,
-    RawDiskImage,
-    # X86AtomicSimpleCPU,
-    X86E820Entry,
-    X86FsLinux,
-    X86IntelMPBus,
-    X86IntelMPBusHierarchy,
-    X86IntelMPIOAPIC,
-    X86IntelMPIOIntAssignment,
-    X86IntelMPProcessor,
-    X86SMBiosBiosInformation,
-)
+from m5.objects import *
 from m5.params import Latency
 from m5.util.convert import toMemorySize
 
@@ -304,29 +277,42 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         entries.append(X86E820Entry(addr=0x100000000, size=f"{cxl_mem_range.size()}B", range_type=1))
 
         self.workload.e820_table.entries = entries
+    
+    def createRandomTraffic(self, tgen, mem_start, mem_end):
+        yield tgen.createRandom(1000000000,
+                                   mem_start,
+                                   mem_end,
+                                   64,
+                                   10,
+                                   1000,
+                                   60,
+                                   0)
+        yield tgen.createExit(0)
 
     def _setup_cxl_type2_device(self):
         # setup an core
         hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
-        self.afu_host = RandomGenerator(
-            num_cores = 1,
-            duration='5s',
-            rate="250MB/s",
-            min_addr=0x0,
-            max_addr=self.get_memory().get_size(),
-            block_size=64,
-            rd_perc=60  # 60% reads, 40% writes
-        )
-        self.afu_device = RandomGenerator(
-             num_cores = 1,
-            duration='5s',
-            rate="250MB/s",
-            min_addr=0x100000000,
-            max_addr=0x100000000 + self.get_cxl_memory().get_size(),
-            block_size=64,
-            rd_perc=60  # 60% reads, 40% writes
-        )
+        self.afu_host = PyTrafficGen()
+        # self.afu_host.generator = [RandomGenerator(
+        #     num_cores = 1,
+        #     duration='5s',
+        #     rate="250MB/s",
+        #     min_addr=0x0,
+        #     max_addr=self.get_memory().get_size(),
+        #     block_size=64,
+        #     rd_perc=60  # 60% reads, 40% writes
+        # )]
+        self.afu_host = PyTrafficGen()
+        # self.afu_device = RandomGenerator(
+        #     num_cores = 1,
+        #     duration='5s',
+        #     rate="250MB/s",
+        #     min_addr=0x100000000,
+        #     max_addr=0x100000000 + self.get_cxl_memory().get_size(),
+        #     block_size=64,
+        #     rd_perc=60  # 60% reads, 40% writes
+        # )
         self.afu_hmc=Cache(
             assoc=16,
             tag_latency=10,
