@@ -78,7 +78,7 @@ from gem5.resources.resource import AbstractResource
 from gem5.utils.override import overrides
 
 
-class X86Board(AbstractSystemBoard, SEBinaryWorkload):
+class X86Board(AbstractSystemBoard, KernelDiskWorkload):
     """
     A board capable of full system simulation for X86.
 
