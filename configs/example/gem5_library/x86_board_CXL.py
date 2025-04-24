@@ -104,9 +104,6 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             cxl_memory=cxl_memory,
             is_asic=is_asic,
         )
-        cxl_mem_start = 0x100000000
-        cxl_dram = self.get_cxl_memory()
-        self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
 
         if self.get_processor().get_isa() != ISA.X86:
             raise Exception(
@@ -171,9 +168,9 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             ]
 
             # Configure CXL Device
-            # cxl_mem_start = 0x100000000
+            cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            # self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
+            self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
             self.bridge.ranges.append(self.cxl_mem_range)
             self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
             cxl_dram.set_memory_range([self.cxl_mem_range])
@@ -314,8 +311,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
         self.afu_host = RandomGenerator(
             duration='5s',
-            min_addr=self.mem_ranges[0].start(),
-            max_addr=self.mem_ranges[0].end(),
+            min_addr=0x0,
+            max_addr=self.get_memory().get_size(),
             block_size=64,
             min_period='10ns',
             max_period='10ns',
@@ -324,7 +321,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_device = RandomGenerator(
             duration='5s',
             min_addr=0x100000000,
-            max_addr=self.cxl_mem_range.end(),
+            max_addr=0x100000000 + self.get_cxl_memory().get_size(),
             block_size=64,
             min_period='10ns',
             max_period='10ns',
