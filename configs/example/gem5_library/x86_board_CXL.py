@@ -170,10 +170,10 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             # Configure CXL Device
             cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
-            self.bridge.ranges.append(self.cxl_mem_range)
-            self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
-            cxl_dram.set_memory_range([self.cxl_mem_range])
+            cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
+            self.bridge.ranges.append(cxl_mem_range)
+            self.pc.south_bridge.cxlmemory.cxl_mem_range = cxl_mem_range
+            cxl_dram.set_memory_range([cxl_mem_range])
             cxl_abstract_mems = []
             for mc in cxl_dram.get_memory_controllers():
                 cxl_abstract_mems.append(mc.dram)
