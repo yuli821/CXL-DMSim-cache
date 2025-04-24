@@ -301,7 +301,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             X86E820Entry(addr=0xFFFF0000, size="64kB", range_type=2)
         )
 
-        entries.append(X86E820Entry(addr=0x100000000, size=f"{self.cxl_mem_range.size()}B", range_type=1))
+        entries.append(X86E820Entry(addr=0x100000000, size=f"{cxl_mem_range.size()}B", range_type=1))
 
         self.workload.e820_table.entries = entries
 
