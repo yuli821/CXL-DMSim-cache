@@ -169,9 +169,9 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
             ]
 
             # Configure CXL Device
-            self.cxl_mem_start = 0x100000000
+            cxl_mem_start = 0x100000000
             cxl_dram = self.get_cxl_memory()
-            self.cxl_mem_range = AddrRange(Addr(self.cxl_mem_start), size=cxl_dram.get_size())
+            self.cxl_mem_range = AddrRange(Addr(cxl_mem_start), size=cxl_dram.get_size())
             self.bridge.ranges.append(self.cxl_mem_range)
             self.pc.south_bridge.cxlmemory.cxl_mem_range = self.cxl_mem_range
             cxl_dram.set_memory_range([self.cxl_mem_range])
@@ -320,7 +320,7 @@ class X86Board(AbstractSystemBoard, SEBinaryWorkload):
         )
         self.afu_dmc = RandomGenerator(
             duration='5s',
-            min_addr=self.cxl_mem_start,
+            min_addr=self.cxl_mem_range.start(),
             max_addr=self.cxl_mem_range.end(),
             block_size=64,
             min_period='10ns',
