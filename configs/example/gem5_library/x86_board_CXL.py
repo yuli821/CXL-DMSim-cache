@@ -303,7 +303,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         #     block_size=64,
         #     rd_perc=60  # 60% reads, 40% writes
         # )]
-        self.afu_host = PyTrafficGen()
+        self.afu_device = PyTrafficGen()
         # self.afu_device = RandomGenerator(
         #     num_cores = 1,
         #     duration='5s',
