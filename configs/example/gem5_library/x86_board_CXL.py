@@ -314,11 +314,11 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         #     rd_perc=60  # 60% reads, 40% writes
         # )
         self.afu_hmc=Cache(
-            assoc=16,
-            tag_latency=10,
-            data_latency=10,
-            response_latency=1,
-            mshrs=20,
+            assoc=8,
+            tag_latency=500,
+            data_latency=500,
+            response_latency=500,
+            mshrs=32,
             size="2MB",
             tgts_per_mshr=12,
             write_buffers=32,
@@ -327,10 +327,10 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             addr_ranges=hmc_addrRangeList)
         self.afu_dmc=Cache(
             assoc=16,
-            tag_latency=50,
-            data_latency=50,
-            response_latency=50,
-            mshrs=32,
+            tag_latency=10,
+            data_latency=10,
+            response_latency=1,
+            mshrs=20,
             size="2MB",
             tgts_per_mshr=12,
             write_buffers=32,
