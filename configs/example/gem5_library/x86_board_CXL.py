@@ -279,20 +279,18 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.workload.e820_table.entries = entries
     
     def createRandomTraffic(self, tgen, mem_start, mem_end):
-        yield tgen.createRandom(1000000000,
+        yield tgen.createRandom(100000000000000,
                                    mem_start,
                                    mem_end,
                                    64,
-                                   10,
-                                   1000,
+                                   100000,
+                                   1000000,
                                    60,
                                    0)
-        yield tgen.createExit(0)
+        # yield tgen.createExit(0)
 
     def _setup_cxl_type2_device(self):
         # setup an core
-        hmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_memory().get_memory_controllers()]
-        dmc_addrRangeList = [ctrl.dram.range for ctrl in self.get_cxl_memory().get_memory_controllers()]
         self.afu_host = PyTrafficGen()
         self.afu_device = PyTrafficGen()
         self.afu_hmc=Cache(
@@ -306,7 +304,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=hmc_addrRangeList)
+            addr_ranges=[AddrRange(Addr(0x0), size=0xC0000000)])
         self.afu_dmc=Cache(
             assoc=16,
             tag_latency=10,
@@ -318,7 +316,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=dmc_addrRangeList,)
+            addr_ranges=[AddrRange(Addr(0x100000000), size=0x300000000)],)
         self.dmc_bus = SystemXBar(width=64)
         self.dmc_bus.badaddr_responder = BadAddr()
         self.dmc_bus.default = self.dmc_bus.badaddr_responder.pio
