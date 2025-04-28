@@ -316,7 +316,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(Addr(0x100000000), size=0x300000000)],)
+            addr_ranges=[AddrRange(Addr(0x100000000), size=0x200000000)],)
         self.dmc_bus = SystemXBar(width=64)
         self.dmc_bus.badaddr_responder = BadAddr()
         self.dmc_bus.default = self.dmc_bus.badaddr_responder.pio
