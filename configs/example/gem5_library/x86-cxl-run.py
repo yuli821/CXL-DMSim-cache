@@ -173,6 +173,7 @@ command = (
     "m5 exit;"
     + "numactl -H;"
     + "m5 resetstats;"
+    + "m5 exit;"
     + "/home/cxl_benchmark/"
     + args.test_cmd
     + ";"
