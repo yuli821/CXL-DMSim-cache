@@ -178,6 +178,7 @@ command = (
     + args.test_cmd
     + ";"
     + "m5 dumpstats;"
+    + "m5 exit;"
 )
 
 # Please modify the paths of kernel and disk_image according to the location of your files.
