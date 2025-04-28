@@ -190,8 +190,8 @@ board.set_kernel_disk_workload(
 
 def start_generator():
     print("Start generator")
-    board.afu_host.start(board.createRandomTraffic(board.afu_host, 0x0, 0xC0000000))
-    board.afu_device.start(board.createRandomTraffic(board.afu_device, 0x100000000, 0x300000000))
+    board.afu_host.start(board.createRandomTraffic(board.afu_host, 0, 3221225408))
+    board.afu_device.start(board.createRandomTraffic(board.afu_device, 4294967296, 12884901824))
 
 simulator = Simulator(
     board=board,

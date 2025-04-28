@@ -304,7 +304,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(Addr(0x0), size=0xC0000000)])
+            addr_ranges=[AddrRange(self.get_memory().get_size()-64)])
         self.afu_dmc=Cache(
             assoc=16,
             tag_latency=10,
@@ -316,7 +316,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(Addr(0x100000000), size=0x200000000)],)
+            addr_ranges=[AddrRange(Addr(0x100000000), size=self.get_cxl_memory().get_size()-64)],)
         self.dmc_bus = SystemXBar(width=64)
         self.dmc_bus.badaddr_responder = BadAddr()
         self.dmc_bus.default = self.dmc_bus.badaddr_responder.pio
