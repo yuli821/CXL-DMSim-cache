@@ -46,6 +46,7 @@ readUnimpl(const std::string &label)
 {
     return [label](I8237::Register &reg) -> uint8_t {
         warn("Read from i8237 %s unimplemented.", label);
+        return 0;
     };
 }
 
@@ -54,6 +55,7 @@ writeUnimpl(const std::string &label)
 {
     return [label](I8237::Register &reg, const uint8_t &value) {
         warn("Write to i8237 %s unimplemented.", label);
+        return 0;
     };
 }
 
