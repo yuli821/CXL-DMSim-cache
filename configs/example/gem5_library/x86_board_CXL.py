@@ -327,9 +327,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_dmc.cpu_side = self.afu_device.port
         self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
         self.afu_dmc.mem_side = self.dmc_bus.cpu_side_ports
-        cxl_dram = self.get_cxl_memory()
-        for _, port in cxl_dram.get_mem_ports():
-            self.dmc_bus.mem_side_ports = port
+        self.dmc_bus.mem_side_ports = self.cxl_mem_bus.cpu_side_ports
 
 
     @overrides(AbstractSystemBoard)
