@@ -45,7 +45,7 @@ I8237::Register::ReadFunc
 readUnimpl(const std::string &label)
 {
     return [label](I8237::Register &reg) -> uint8_t {
-        panic("Read from i8237 %s unimplemented.", label);
+        warn("Read from i8237 %s unimplemented.", label);
     };
 }
 
@@ -53,7 +53,7 @@ I8237::Register::WriteFunc
 writeUnimpl(const std::string &label)
 {
     return [label](I8237::Register &reg, const uint8_t &value) {
-        panic("Write to i8237 %s unimplemented.", label);
+        warn("Write to i8237 %s unimplemented.", label);
     };
 }
 
