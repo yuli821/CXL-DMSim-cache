@@ -283,8 +283,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                                    mem_start,
                                    mem_end,
                                    64,
-                                   100000,
-                                   100000,
+                                   1000000,
+                                   1000000,
                                    60,
                                    0)
         # yield tgen.createExit(0)
