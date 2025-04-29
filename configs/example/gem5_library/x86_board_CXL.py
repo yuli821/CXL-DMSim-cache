@@ -279,13 +279,13 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.workload.e820_table.entries = entries
     
     def createRandomTraffic(self, tgen, mem_start, mem_end):
-        yield tgen.createRandom(100000000000000,
+        yield tgen.createRandom(1000000000000000,
                                    mem_start,
                                    mem_end,
                                    64,
-                                   10000000,
-                                   10000000,
-                                   100,
+                                   100000,
+                                   100000,
+                                   60,
                                    0)
         # yield tgen.createExit(0)
 

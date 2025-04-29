@@ -207,3 +207,5 @@ print("Using Atomic cpu")
 m5.stats.reset()
 
 simulator.run()
+
+m5.stats.dump()
