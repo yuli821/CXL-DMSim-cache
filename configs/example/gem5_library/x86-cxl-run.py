@@ -174,7 +174,7 @@ command = (
     + "numactl -H;"
     + "m5 resetstats;"
     + "m5 exit;"
-    + "numactl --membind = 1 --cpunodebind=0 /home/cxl_benchmark/lmbench3/bin/x86_64-linux-gnu/lat_mem_rd -t -N 2 4 64"
+    + "numactl --membind=1 --cpunodebind=0 /home/cxl_benchmark/lmbench3/bin/x86_64-linux-gnu/lat_mem_rd -t -N 2 4 64"
     + ";"
     + "m5 dumpstats;"
     + "m5 exit;"
