@@ -283,8 +283,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                                    mem_start,
                                    mem_end,
                                    64,
-                                   1000000,
-                                   1000000,
+                                   10000000,
+                                   10000000,
                                    60,
                                    0)
         # yield tgen.createExit(0)
@@ -295,9 +295,9 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_device = PyTrafficGen()
         self.afu_hmc=Cache(
             assoc=8,
-            tag_latency=500,
-            data_latency=500,
-            response_latency=500,
+            tag_latency=5000000,
+            data_latency=5000000,
+            response_latency=5000000,
             mshrs=32,
             size="2MB",
             tgts_per_mshr=12,
