@@ -264,9 +264,10 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             # Mark the rest of physical memory as available
             X86E820Entry(
                 addr=0x100000,
-                size=f"{self.mem_ranges[0].size() - 0x100000:d}B",
+                size="2560MB",
                 range_type=1,
             ),
+            X86E820Entry(addr=0xA0100000, size="511MB", range_type=2),       # Reserved for TrafficGen
         ]
 
         # Reserve the last 16kB of the 32-bit address space for m5ops
@@ -294,17 +295,17 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         self.afu_host = PyTrafficGen()
         self.afu_device = PyTrafficGen()
         self.afu_hmc=Cache(
-            assoc=8,
-            tag_latency=500000,
-            data_latency=500000,
-            response_latency=500000,
-            mshrs=32,
+            assoc=16,
+            tag_latency=10,
+            data_latency=10,
+            response_latency=1,
+            mshrs=20,
             size="2MB",
             tgts_per_mshr=12,
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(self.get_memory().get_size()-64)])
+            addr_ranges=[AddrRangeAddr(0xA0100000), size=535822336])
         self.afu_dmc=Cache(
             assoc=16,
             tag_latency=10,
@@ -316,14 +317,20 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(Addr(0x100000000), size=self.get_cxl_memory().get_size()-64)],)
+            addr_ranges=[AddrRange(Addr(0x100000000), size=self.get_cxl_memory().get_size()],)
+        self.hmc_bridge = Bridge(delay="50ns")
+        self.hmc_bridge.ranges = [
+            AddrRange(self.get_memory().get_size()-64)
+        ]
+
         self.dmc_bus = SystemXBar(width=64)
         self.dmc_bus.badaddr_responder = BadAddr()
         self.dmc_bus.default = self.dmc_bus.badaddr_responder.pio
         #connection
+        self.hmc_bridge.mem_side_port = self.cache_hierarchy.membus.cpu_side_ports
         self.afu_hmc.cpu_side = self.afu_host.port
         self.afu_dmc.cpu_side = self.afu_device.port
-        self.afu_hmc.mem_side = self.cache_hierarchy.membus.cpu_side_ports
+        self.afu_hmc.mem_side = self.hmc_bridge.cpu_side_port
         self.afu_dmc.mem_side = self.dmc_bus.cpu_side_ports
         self.dmc_bus.mem_side_ports = self.cxl_mem_bus.cpu_side_ports
 
