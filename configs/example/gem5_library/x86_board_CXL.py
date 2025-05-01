@@ -294,7 +294,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         # setup an core
         self.afu_host = PyTrafficGen()
         self.afu_device = PyTrafficGen()
-        self.afu_hmc=Cache(
+        self.afu_hmc = Cache(
             assoc=16,
             tag_latency=10,
             data_latency=10,
@@ -305,8 +305,9 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRangeAddr(0xA0100000), size=535822336])
-        self.afu_dmc=Cache(
+            addr_ranges=[AddrRange(Addr(0xA0100000), size=535822336)],
+        )
+        self.afu_dmc = Cache(
             assoc=16,
             tag_latency=10,
             data_latency=10,
@@ -317,7 +318,12 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(Addr(0x100000000), size=self.get_cxl_memory().get_size()],)
+            addr_ranges=[
+                AddrRange(
+                    Addr(0x100000000), size=self.get_cxl_memory().get_size()
+                )
+            ],
+        )
         self.hmc_bridge = Bridge(delay="50ns")
         self.hmc_bridge.ranges = [
             AddrRange(self.get_memory().get_size()-64)
