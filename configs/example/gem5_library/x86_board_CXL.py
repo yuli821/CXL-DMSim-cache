@@ -264,10 +264,9 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             # Mark the rest of physical memory as available
             X86E820Entry(
                 addr=0x100000,
-                size="2560MB",
+                size=f"{self.mem_ranges[0].size() - 0x100000:d}B",
                 range_type=1,
             ),
-            X86E820Entry(addr=0xA0100000, size="511MB", range_type=2),       # Reserved for TrafficGen
         ]
 
         # Reserve the last 16kB of the 32-bit address space for m5ops
@@ -286,7 +285,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
                                    64,
                                    100000,
                                    100000,
-                                   50,
+                                   100,
                                    0)
         # yield tgen.createExit(0)
 
@@ -294,7 +293,7 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
         # setup an core
         self.afu_host = PyTrafficGen()
         self.afu_device = PyTrafficGen()
-        self.afu_hmc = Cache(
+        self.afu_hmc=Cache(
             assoc=16,
             tag_latency=10,
             data_latency=10,
@@ -305,9 +304,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[AddrRange(Addr(0xA0100000), size=535822336)],
-        )
-        self.afu_dmc = Cache(
+            addr_ranges=[AddrRange(self.get_memory().get_size()-64)])
+        self.afu_dmc=Cache(
             assoc=16,
             tag_latency=10,
             data_latency=10,
@@ -318,13 +316,8 @@ class X86Board(AbstractSystemBoard, KernelDiskWorkload):
             write_buffers=32,
             writeback_clean=False,
             clusivity="mostly_excl",
-            addr_ranges=[
-                AddrRange(
-                    Addr(0x100000000), size=self.get_cxl_memory().get_size()
-                )
-            ],
-        )
-        self.hmc_bridge = Bridge(delay="50ns")
+            addr_ranges=[AddrRange(Addr(0x100000000), size=self.get_cxl_memory().get_size()-64)],)
+        self.hmc_bridge = Bridge(delay="500ns")
         self.hmc_bridge.ranges = [
             AddrRange(self.get_memory().get_size()-64)
         ]
