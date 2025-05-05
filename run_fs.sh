@@ -4,9 +4,9 @@
 # The test results are consistent between the two CPU types, but the TIMING CPU will be much faster.
 # build/X86/gem5.opt -d "output/fs_lmbench_dram" configs/example/gem5_library/x86-cxl-run.py --is_asic True --test_cmd lmbench_dram.sh --cpu_type TIMING
 
-build/X86/gem5.opt -d "output/fs_lmbench_cxl_ASIC" configs/example/gem5_library/x86-cxl-run.py --is_asic True --test_cmd lmbench_cxl.sh --cpu_type TIMING
+# build/X86/gem5.opt -d "output/fs_lmbench_cxl_ASIC" configs/example/gem5_library/x86-cxl-run.py --is_asic True --test_cmd lmbench_cxl.sh --cpu_type TIMING
 
-# build/X86/gem5.opt -d "output/fs_lmbench_cxl_FPGA" configs/example/gem5_library/x86-cxl-run.py --is_asic False --test_cmd lmbench_cxl.sh --cpu_type TIMING
+build/X86/gem5.opt -d "output/fs_lmbench_cxl_FPGA" configs/example/gem5_library/x86-cxl-run.py --is_asic False --test_cmd lmbench_cxl.sh --cpu_type TIMING
 
 # build/X86/gem5.opt -d "output/fs_lmbench_dram" configs/example/gem5_library/x86-cxl-run.py --is_asic True --test_cmd lmbench_dram.sh --cpu_type O3
 
